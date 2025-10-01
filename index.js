@@ -8,7 +8,7 @@ const token = Buffer.from("Qm90IE1UUXhPVEk0T1RBOE56TTJNVEQxTVRRd01UUXdOQS5HcldjV
 app.get("/messages/:channelId", async (req, res) => {
   try {
     const r = await fetch(`https://discord.com/api/v9/channels/${req.params.channelId}/messages?limit=100`, {
-      headers: { Authorization: token }
+      headers: { Authorization: "Bot " + token }
     });
     const text = await r.text();
     try {
@@ -23,3 +23,4 @@ app.get("/messages/:channelId", async (req, res) => {
 });
 
 app.listen(process.env.PORT || 3000, () => console.log("Proxy running"));
+
