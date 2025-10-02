@@ -79,14 +79,6 @@ app.get("/ranker", async (req, res) => {
     userid = Number(userid);
     rank = Number(rank);
 
-    console.log({
-      groupId,
-      userid,
-      roleId: rank,
-      csrfTokenLength: csrfToken.length,
-      cookieLength: process.env.ROBLOSECURITY.length
-    });
-
     if (isNaN(userid) || isNaN(rank)) {
       return res.status(400).json({ error: "Invalid userid or rank" });
     }
@@ -96,6 +88,14 @@ app.get("/ranker", async (req, res) => {
       return res.status(500).json({ error: "Invalid GROUP_ID in env" });
     }
 
+    console.log({
+      groupId,
+      userid,
+      roleId: rank,
+      csrfTokenLength: csrfToken.length,
+      cookieLength: process.env.ROBLOSECURITY.length
+    });
+    
     const headers = {
       "Cookie": `.ROBLOSECURITY=${process.env.ROBLOSECURITY}`,
       "User-Agent": "Roblox/WinInet",
@@ -115,7 +115,16 @@ app.get("/ranker", async (req, res) => {
       return res.status(400).json({ error: `Invalid roleId ${rank} for this group` });
     }
 
-    // Step 2: Send PATCH request to assign role
+    // fetch user in group
+    const userResponse = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, { headers });
+    const userData = await userResponse.json();
+    
+    // skip if already in role
+    if (userData.role && userData.role.id === rank) {
+        return res.json({ status: "skipped", reason: "user already in role" });
+    }
+    
+    // PATCH to assign role...
     let csrfToken = process.env.CSRF_TOKEN;
 
     let response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
@@ -153,4 +162,5 @@ app.get("/ranker", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
