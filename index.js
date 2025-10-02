@@ -1,19 +1,18 @@
 import express from "express";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
-import FormData from "form-data";
 
 dotenv.config();
 
 const app = express();
-const WEBHOOK = process.env.DISCORD_WEBHOOK;
+const token = process.env.DISCORD_TOKEN;
 
 app.use(express.json({ limit: "10mb" }));
 
 app.get("/messages/:channelId", async (req, res) => {
   try {
     const r = await fetch(`https://discord.com/api/v9/channels/${req.params.channelId}/messages?limit=100`, {
-      headers: { Authorization: process.env.DISCORD_TOKEN }
+      headers: { Authorization: token }
     });
     const data = await r.json();
     res.json(data);
@@ -28,7 +27,7 @@ app.post("/react/:channelId/:messageId/:emoji", async (req, res) => {
       `https://discord.com/api/v9/channels/${req.params.channelId}/messages/${req.params.messageId}/reactions/${encodeURIComponent(req.params.emoji)}/@me`,
       {
         method: "PUT",
-        headers: { Authorization: process.env.DISCORD_TOKEN }
+        headers: { Authorization: token }
       }
     );
     res.json({ status: "ok" });
@@ -37,17 +36,29 @@ app.post("/react/:channelId/:messageId/:emoji", async (req, res) => {
   }
 });
 
+// 🧩 NEW: Send a message with an attached .txt file
 app.post("/upload/:channelId", async (req, res) => {
   try {
     const { filename, content, message } = req.body;
+    const boundary = "----DiscordBoundary" + Math.random().toString(16).slice(2);
 
-    const form = new FormData();
-    form.append("content", message || "");
-    form.append("file", Buffer.from(content), filename || "file.txt");
+    const body =
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="payload_json"\r\n\r\n` +
+      JSON.stringify({ content: message || "" }) + "\r\n" +
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="file"; filename="${filename || "file.txt"}"\r\n` +
+      `Content-Type: text/plain\r\n\r\n` +
+      content + "\r\n" +
+      `--${boundary}--`;
 
-    const response = await fetch(WEBHOOK, {
+    const response = await fetch(`https://discord.com/api/v9/channels/${req.params.channelId}/messages`, {
       method: "POST",
-      body: form
+      headers: {
+        "Authorization": token,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`
+      },
+      body
     });
 
     const data = await response.json();
