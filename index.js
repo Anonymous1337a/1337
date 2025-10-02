@@ -128,14 +128,6 @@ app.get("/ranker", async (req, res) => {
       },
       body: JSON.stringify({ roleId: rank })
     });
-
-    console.log({
-      groupId,
-      userid,
-      roleId: rank,
-      csrfTokenLength: csrfToken.length,
-      cookieLength: process.env.ROBLOSECURITY.length
-    });
     
     // Retry once if CSRF token expired
     if (response.status === 403) {
@@ -162,3 +154,4 @@ app.get("/ranker", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
