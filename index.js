@@ -78,15 +78,20 @@ app.get("/ranker", async (req, res) => {
   try {
     let csrfToken = process.env.CSRF_TOKEN;
 
-    let response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
+    response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
       method: "PATCH",
       headers: {
+        "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
         "x-csrf-token": csrfToken,
         "Cookie": `.ROBLOSECURITY=${process.env.COOKIE}`,
+        "User-Agent": "Roblox/WinInet",
+        "Origin": "https://www.roblox.com",
+        "Referer": "https://www.roblox.com/"
       },
-      body: JSON.stringify({ roleId: Number(rank) }),
+      body: JSON.stringify({ roleId: Number(rank) })
     });
+
 
     if (response.status === 403) {
       const newToken = response.headers.get("x-csrf-token");
@@ -111,3 +116,4 @@ app.get("/ranker", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
