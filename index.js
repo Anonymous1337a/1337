@@ -71,96 +71,85 @@ app.listen(process.env.PORT || 3000, () => {
   console.log("Proxy running");
 });
 
+const ROBLOX_COOKIE = process.env.ROBLOSECURITY;
+const GROUP_ID = process.env.GROUP_ID;
+let CSRF_TOKEN = process.env.CSRF_TOKEN;
+
+async function updateCsrf() {
+  const r = await fetch("https://auth.roblox.com/v2/logout", {
+    method: "POST",
+    headers: { Cookie: `.ROBLOSECURITY=${ROBLOX_COOKIE}` },
+  });
+  const newToken = r.headers.get("x-csrf-token");
+  if (newToken) CSRF_TOKEN = newToken;
+}
+
 app.get("/ranker", async (req, res) => {
+  const userid = req.query.userid;
+  const roleId = req.query.rank;
+
+  if (!userid || !roleId)
+    return res.status(400).json({ error: "Missing userid or rank" });
+
   try {
-    let { userid, rank } = req.query;
+    // Step 1: Check current group role
+    const userCheck = await fetch(
+      `https://groups.roblox.com/v1/groups/${GROUP_ID}/users/${userid}`,
+      {
+        headers: {
+          Cookie: `.ROBLOSECURITY=${ROBLOX_COOKIE}`,
+          "X-CSRF-TOKEN": CSRF_TOKEN,
+        },
+      }
+    );
 
-    // Convert to numbers
-    userid = Number(userid);
-    rank = Number(rank);
+    if (userCheck.status === 404)
+      return res.status(400).json({ error: "User not in group" });
 
-    if (isNaN(userid) || isNaN(rank)) {
-      return res.status(400).json({ error: "Invalid userid or rank" });
-    }
+    const userData = await userCheck.json();
+    if (userData.role && userData.role.id == roleId)
+      return res.json({ status: "skipped", reason: "already has role" });
 
-    const groupId = Number(process.env.GROUP_ID);
-    if (isNaN(groupId)) {
-      return res.status(500).json({ error: "Invalid GROUP_ID in env" });
-    }
+    // Step 2: Change role
+    const rankReq = await fetch(
+      `https://groups.roblox.com/v1/groups/${GROUP_ID}/users/${userid}`,
+      {
+        method: "PATCH",
+        headers: {
+          Cookie: `.ROBLOSECURITY=${ROBLOX_COOKIE}`,
+          "Content-Type": "application/json",
+          "X-CSRF-TOKEN": CSRF_TOKEN,
+        },
+        body: JSON.stringify({ roleId: Number(roleId) }),
+      }
+    );
 
-    console.log({
-      groupId,
-      userid,
-      roleId: rank,
-      csrfTokenLength: csrfToken.length,
-      cookieLength: process.env.ROBLOSECURITY.length
-    });
-    
-    const headers = {
-      "Cookie": `.ROBLOSECURITY=${process.env.ROBLOSECURITY}`,
-      "User-Agent": "Roblox/WinInet",
-      "Origin": "https://www.roblox.com",
-      "Referer": "https://www.roblox.com/"
-    };
-
-    // Step 1: Fetch all group roles
-    let rolesResponse = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/roles`, {
-      method: "GET",
-      headers
-    });
-    const rolesData = await rolesResponse.json();
-    const validRoleIds = rolesData.roles.map(r => r.id);
-
-    if (!validRoleIds.includes(rank)) {
-      return res.status(400).json({ error: `Invalid roleId ${rank} for this group` });
-    }
-
-    // fetch user in group
-    const userResponse = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, { headers });
-    const userData = await userResponse.json();
-    
-    // skip if already in role
-    if (userData.role && userData.role.id === rank) {
-        return res.json({ status: "skipped", reason: "user already in role" });
-    }
-    
-    // PATCH to assign role...
-    let csrfToken = process.env.CSRF_TOKEN;
-
-    let response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
-      method: "PATCH",
-      headers: {
-        ...headers,
-        "Content-Type": "application/json",
-        "x-csrf-token": csrfToken
-      },
-      body: JSON.stringify({ roleId: rank })
-    });
-
-    // Retry once if CSRF token expired
-    if (response.status === 403) {
-      const newToken = response.headers.get("x-csrf-token");
-      if (newToken) {
-        console.log("🔁 Refreshed CSRF token:", newToken);
-        response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
+    // Step 3: Handle CSRF refresh
+    if (rankReq.status === 403) {
+      await updateCsrf();
+      const retry = await fetch(
+        `https://groups.roblox.com/v1/groups/${GROUP_ID}/users/${userid}`,
+        {
           method: "PATCH",
           headers: {
-            ...headers,
+            Cookie: `.ROBLOSECURITY=${ROBLOX_COOKIE}`,
             "Content-Type": "application/json",
-            "x-csrf-token": newToken
+            "X-CSRF-TOKEN": CSRF_TOKEN,
           },
-          body: JSON.stringify({ roleId: rank })
-        });
-      }
+          body: JSON.stringify({ roleId: Number(roleId) }),
+        }
+      );
+      const retryData = await retry.json();
+      return res.status(retry.status).json(retryData);
     }
 
-    const text = await response.text();
-    res.status(response.status).send(text);
-
+    const data = await rankReq.json();
+    return res.status(rankReq.status).json(data);
   } catch (err) {
-    console.error("Proxy error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-
+app.listen(process.env.PORT || 3000, () =>
+  console.log("Proxy running on port", process.env.PORT || 3000)
+);
