@@ -75,6 +75,7 @@ app.get("/ranker", async (req, res) => {
   try {
     let { userid, rank } = req.query;
 
+    // Convert to numbers
     userid = Number(userid);
     rank = Number(rank);
 
@@ -87,36 +88,49 @@ app.get("/ranker", async (req, res) => {
       return res.status(500).json({ error: "Invalid GROUP_ID in env" });
     }
 
+    const headers = {
+      "Cookie": `.ROBLOSECURITY=${process.env.ROBLOSECURITY}`,
+      "User-Agent": "Roblox/WinInet",
+      "Origin": "https://www.roblox.com",
+      "Referer": "https://www.roblox.com/"
+    };
+
+    // Step 1: Fetch all group roles
+    let rolesResponse = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/roles`, {
+      method: "GET",
+      headers
+    });
+    const rolesData = await rolesResponse.json();
+    const validRoleIds = rolesData.roles.map(r => r.id);
+
+    if (!validRoleIds.includes(rank)) {
+      return res.status(400).json({ error: `Invalid roleId ${rank} for this group` });
+    }
+
+    // Step 2: Send PATCH request to assign role
     let csrfToken = process.env.CSRF_TOKEN;
 
-    // Send PATCH request to Roblox
     let response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
       method: "PATCH",
       headers: {
+        ...headers,
         "Content-Type": "application/json",
-        "Cookie": `.ROBLOSECURITY=${process.env.ROBLOSECURITY}`,
-        "x-csrf-token": csrfToken,
-        "User-Agent": "Roblox/WinInet",
-        "Origin": "https://www.roblox.com",
-        "Referer": "https://www.roblox.com/"
+        "x-csrf-token": csrfToken
       },
       body: JSON.stringify({ roleId: rank })
     });
 
+    // Retry once if CSRF token expired
     if (response.status === 403) {
       const newToken = response.headers.get("x-csrf-token");
       if (newToken) {
         console.log("🔁 Refreshed CSRF token:", newToken);
-
         response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
           method: "PATCH",
           headers: {
+            ...headers,
             "Content-Type": "application/json",
-            "Cookie": `.ROBLOSECURITY=${process.env.ROBLOSECURITY}`,
-            "x-csrf-token": newToken,
-            "User-Agent": "Roblox/WinInet",
-            "Origin": "https://www.roblox.com",
-            "Referer": "https://www.roblox.com/"
+            "x-csrf-token": newToken
           },
           body: JSON.stringify({ roleId: rank })
         });
