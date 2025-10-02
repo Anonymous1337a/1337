@@ -83,6 +83,7 @@ app.get("/ranker", async (req, res) => {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
+        "x-csrf-token": process.env.CSRF_TOKEN,
         "Cookie": `.ROBLOSECURITY=${cookie}`
       },
       body: JSON.stringify({ roleId: parseInt(rank) })
@@ -94,3 +95,4 @@ app.get("/ranker", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
