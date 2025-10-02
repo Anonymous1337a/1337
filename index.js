@@ -72,26 +72,50 @@ app.listen(process.env.PORT || 3000, () => {
 });
 
 app.get("/ranker", async (req, res) => {
-  try {
-    const { userid, rank } = req.query;
+  const { userid, rank } = req.query;
+  const groupId = process.env.GROUP_ID;
 
-    const response = await fetch(`https://groups.roblox.com/v1/groups/${process.env.GROUP_ID}/users/${userid}`, {
+  try {
+    let csrfToken = process.env.CSRF_TOKEN;
+
+    let response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         "Cookie": `.ROBLOSECURITY=${process.env.ROBLOSECURITY}`,
-        "X-CSRF-TOKEN": process.env.CSRF_TOKEN
+        "x-csrf-token": csrfToken,
+        "User-Agent": "Roblox/WinInet",
+        "Origin": "https://www.roblox.com",
+        "Referer": "https://www.roblox.com/"
       },
-      body: JSON.stringify({ roleId: Number(rank) })
+      body: JSON.stringify({ roleId: Number(rank) }),
     });
 
-    const text = await response.text();
-    console.log("Roblox response status:", response.status);
-    console.log("Roblox response body:", text);
+    // If Roblox rejects due to CSRF, get new token and retry
+    if (response.status === 403) {
+      const newToken = response.headers.get("x-csrf-token");
+      if (newToken) {
+        console.log("🔁 Refreshed CSRF token:", newToken);
+        response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Cookie": `.ROBLOSECURITY=${process.env.ROBLOSECURITY}`,
+            "x-csrf-token": newToken,
+            "User-Agent": "Roblox/WinInet",
+            "Origin": "https://www.roblox.com",
+            "Referer": "https://www.roblox.com/"
+          },
+          body: JSON.stringify({ roleId: Number(rank) }),
+        });
+      }
+    }
 
+    const text = await response.text();
     res.status(response.status).send(text);
+
   } catch (err) {
-    console.error("Proxy Error:", err);
+    console.error("Proxy error:", err);
     res.status(500).json({ error: err.message });
   }
 });
