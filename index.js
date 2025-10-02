@@ -72,27 +72,42 @@ app.listen(process.env.PORT || 3000, () => {
 });
 
 app.get("/ranker", async (req, res) => {
+  const { userid, rank } = req.query;
+  const groupId = process.env.GROUP_ID;
+
   try {
-    const { userid, rank } = req.query;
-    if (!userid || !rank) return res.status(400).send("Missing userid or rank");
+    let csrfToken = process.env.CSRF_TOKEN;
 
-    const cookie = process.env.ROBLOSECURITY;
-    const groupId = process.env.GROUP_ID;
-
-    const patch = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
+    let response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        "x-csrf-token": process.env.CSRF_TOKEN,
-        "Cookie": `.ROBLOSECURITY=${cookie}`
+        "x-csrf-token": csrfToken,
+        "Cookie": `.ROBLOSECURITY=${process.env.COOKIE}`,
       },
-      body: JSON.stringify({ roleId: parseInt(rank) })
+      body: JSON.stringify({ roleId: Number(rank) }),
     });
 
-    const result = await patch.json();
-    res.json(result);
+    if (response.status === 403) {
+      const newToken = response.headers.get("x-csrf-token");
+      if (newToken) {
+        console.log("🔁 New CSRF token acquired:", newToken);
+
+        response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-csrf-token": newToken,
+            "Cookie": `.ROBLOSECURITY=${process.env.COOKIE}`,
+          },
+          body: JSON.stringify({ roleId: Number(rank) }),
+        });
+      }
+    }
+
+    const text = await response.text();
+    res.status(response.status).send(text);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
