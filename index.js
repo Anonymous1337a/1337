@@ -124,6 +124,14 @@ app.get("/ranker", async (req, res) => {
       return res.json({ status: "skipped", reason: "user already in role" });
     }
 
+    console.log({
+      userid,
+      rank,
+      csrfToken,
+      headers,
+      body: JSON.stringify({ roleId: rank })
+    });
+
     // Step 3: Get fresh CSRF token
     let csrfToken;
     try {
@@ -178,3 +186,4 @@ app.get("/ranker", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
