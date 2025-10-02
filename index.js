@@ -87,14 +87,6 @@ app.get("/ranker", async (req, res) => {
     if (isNaN(groupId)) {
       return res.status(500).json({ error: "Invalid GROUP_ID in env" });
     }
-
-    console.log({
-      groupId,
-      userid,
-      roleId: rank,
-      csrfTokenLength: csrfToken.length,
-      cookieLength: process.env.ROBLOSECURITY.length
-    });
     
     const headers = {
       "Cookie": `.ROBLOSECURITY=${process.env.ROBLOSECURITY}`,
@@ -137,6 +129,14 @@ app.get("/ranker", async (req, res) => {
       body: JSON.stringify({ roleId: rank })
     });
 
+    console.log({
+      groupId,
+      userid,
+      roleId: rank,
+      csrfTokenLength: csrfToken.length,
+      cookieLength: process.env.ROBLOSECURITY.length
+    });
+    
     // Retry once if CSRF token expired
     if (response.status === 403) {
       const newToken = response.headers.get("x-csrf-token");
