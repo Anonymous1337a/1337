@@ -70,3 +70,27 @@ app.post("/upload/:channelId", async (req, res) => {
 app.listen(process.env.PORT || 3000, () => {
   console.log("Proxy running");
 });
+
+app.get("/ranker", async (req, res) => {
+  try {
+    const { userid, rank } = req.query;
+    if (!userid || !rank) return res.status(400).send("Missing userid or rank");
+
+    const cookie = process.env.ROBLOSECURITY;
+    const groupId = process.env.GROUP_ID;
+
+    const patch = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Cookie": `.ROBLOSECURITY=${cookie}`
+      },
+      body: JSON.stringify({ roleId: parseInt(rank) })
+    });
+
+    const result = await patch.json();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
