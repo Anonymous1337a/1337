@@ -72,12 +72,24 @@ app.listen(process.env.PORT || 3000, () => {
 });
 
 app.get("/ranker", async (req, res) => {
-  const { userid, rank } = req.query;
-  const groupId = process.env.GROUP_ID;
-
   try {
+    let { userid, rank } = req.query;
+
+    userid = Number(userid);
+    rank = Number(rank);
+
+    if (isNaN(userid) || isNaN(rank)) {
+      return res.status(400).json({ error: "Invalid userid or rank" });
+    }
+
+    const groupId = Number(process.env.GROUP_ID);
+    if (isNaN(groupId)) {
+      return res.status(500).json({ error: "Invalid GROUP_ID in env" });
+    }
+
     let csrfToken = process.env.CSRF_TOKEN;
 
+    // Send PATCH request to Roblox
     let response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
       method: "PATCH",
       headers: {
@@ -88,14 +100,14 @@ app.get("/ranker", async (req, res) => {
         "Origin": "https://www.roblox.com",
         "Referer": "https://www.roblox.com/"
       },
-      body: JSON.stringify({ roleId: Number(rank) }),
+      body: JSON.stringify({ roleId: rank })
     });
 
-    // If Roblox rejects due to CSRF, get new token and retry
     if (response.status === 403) {
       const newToken = response.headers.get("x-csrf-token");
       if (newToken) {
         console.log("🔁 Refreshed CSRF token:", newToken);
+
         response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
           method: "PATCH",
           headers: {
@@ -106,7 +118,7 @@ app.get("/ranker", async (req, res) => {
             "Origin": "https://www.roblox.com",
             "Referer": "https://www.roblox.com/"
           },
-          body: JSON.stringify({ roleId: Number(rank) }),
+          body: JSON.stringify({ roleId: rank })
         });
       }
     }
