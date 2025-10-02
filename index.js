@@ -79,6 +79,14 @@ app.get("/ranker", async (req, res) => {
     userid = Number(userid);
     rank = Number(rank);
 
+    console.log({
+      groupId,
+      userid,
+      roleId: rank,
+      csrfTokenLength: csrfToken.length,
+      cookieLength: process.env.ROBLOSECURITY.length
+    });
+
     if (isNaN(userid) || isNaN(rank)) {
       return res.status(400).json({ error: "Invalid userid or rank" });
     }
@@ -145,3 +153,4 @@ app.get("/ranker", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
