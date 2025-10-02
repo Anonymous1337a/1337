@@ -36,7 +36,6 @@ app.post("/react/:channelId/:messageId/:emoji", async (req, res) => {
   }
 });
 
-// 🧩 NEW: Send a message with an attached .txt file
 app.post("/upload/:channelId", async (req, res) => {
   try {
     const { filename, content, message } = req.body;
