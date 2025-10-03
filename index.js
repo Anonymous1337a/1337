@@ -9,6 +9,8 @@ const token = process.env.DISCORD_TOKEN;
 
 app.use(express.json({ limit: "10mb" }));
 
+console.log(token)
+
 app.get("/messages/:channelId", async (req, res) => {
   try {
     const r = await fetch(`https://discord.com/api/v9/channels/${req.params.channelId}/messages?limit=100`, {
@@ -154,6 +156,7 @@ app.get("/ranker", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
 
