@@ -12,7 +12,7 @@ app.use(express.json({ limit: "10mb" }));
 app.get("/messages/:channelId", async (req, res) => {
   try {
     const r = await fetch(`https://discord.com/api/v9/channels/${req.params.channelId}/messages?limit=100`, {
-      headers: { Authorization: token }
+      headers: { Authorization: `Bot ${token}` }
     });
     const data = await r.json();
     res.json(data);
@@ -27,7 +27,7 @@ app.post("/react/:channelId/:messageId/:emoji", async (req, res) => {
       `https://discord.com/api/v9/channels/${req.params.channelId}/messages/${req.params.messageId}/reactions/${encodeURIComponent(req.params.emoji)}/@me`,
       {
         method: "PUT",
-        headers: { Authorization: token }
+        headers: { Authorization: `Bot ${token}` }
       }
     );
     res.json({ status: "ok" });
@@ -54,7 +54,7 @@ app.post("/upload/:channelId", async (req, res) => {
     const response = await fetch(`https://discord.com/api/v9/channels/${req.params.channelId}/messages`, {
       method: "POST",
       headers: {
-        "Authorization": token,
+        "Authorization": `Bot ${token}`,
         "Content-Type": `multipart/form-data; boundary=${boundary}`
       },
       body
@@ -154,5 +154,6 @@ app.get("/ranker", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
