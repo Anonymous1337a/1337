@@ -14,10 +14,6 @@ app.get("/messages/:channelId", async (req, res) => {
     const r = await fetch(`https://discord.com/api/v9/channels/${req.params.channelId}/messages?limit=100`, {
       headers: { Authorization: token }
     });
-
-    console.log("Status:", r.status, "URL:", r.url);
-    const text = await r.text();
-    console.log("Response:", text.slice(0, 200));
     
     const data = await r.json();
     res.json(data);
@@ -159,6 +155,7 @@ app.get("/ranker", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
 
