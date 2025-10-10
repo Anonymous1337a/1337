@@ -160,24 +160,32 @@ app.get("/checkDisplayname", async (req, res) => {
     const { robloxname } = req.query;
     if (!robloxname) return res.status(400).json({ error: "Missing robloxname" });
 
+    if (!client.isReady()) return res.status(503).json({ error: "Bot not ready" });
+
     const guild = client.guilds.cache.first();
     if (!guild) return res.status(404).json({ error: "No guilds found" });
 
-    await guild.members.fetch();
+    await guild.members.fetch().catch(err => {
+      console.error("Failed to fetch members:", err);
+      return;
+    });
 
     const matches = [];
     guild.members.cache.forEach(member => {
-      if (member.displayName === robloxname) {
-        matches.push({
-          id: member.id,
-          username: member.user.username,
-          displayName: member.displayName
-        });
-      }
+      try {
+        if (member.displayName === robloxname) {
+          matches.push({
+            id: member.id,
+            username: member.user.username,
+            displayName: member.displayName
+          });
+        }
+      } catch {}
     });
 
     res.json({ found: matches.length > 0, matches });
   } catch (err) {
+    console.error("Route error:", err);
     res.status(500).json({ error: err.message });
   }
 });
