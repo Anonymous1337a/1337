@@ -75,7 +75,6 @@ app.get("/ranker", async (req, res) => {
   try {
     let { userid, rank } = req.query;
 
-    // Convert to numbers
     userid = Number(userid);
     rank = Number(rank);
 
@@ -95,7 +94,6 @@ app.get("/ranker", async (req, res) => {
       "Referer": "https://www.roblox.com/"
     };
 
-    // Step 1: Fetch all group roles
     let rolesResponse = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/roles`, {
       method: "GET",
       headers
@@ -107,16 +105,13 @@ app.get("/ranker", async (req, res) => {
       return res.status(400).json({ error: `Invalid roleId ${rank} for this group` });
     }
 
-    // fetch user in group
     const userResponse = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, { headers });
     const userData = await userResponse.json();
     
-    // skip if already in role
     if (userData.role && userData.role.id === rank) {
         return res.json({ status: "skipped", reason: "user already in role" });
     }
     
-    // PATCH to assign role...
     let csrfToken = process.env.CSRF_TOKEN;
 
     let response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
@@ -129,7 +124,6 @@ app.get("/ranker", async (req, res) => {
       body: JSON.stringify({ roleId: rank })
     });
     
-    // Retry once if CSRF token expired
     if (response.status === 403) {
       const newToken = response.headers.get("x-csrf-token");
       if (newToken) {
@@ -151,41 +145,6 @@ app.get("/ranker", async (req, res) => {
 
   } catch (err) {
     console.error("Proxy error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/checkDisplayname", async (req, res) => {
-  try {
-    const { robloxname } = req.query;
-    if (!robloxname) return res.status(400).json({ error: "Missing robloxname" });
-
-    if (!client.isReady()) return res.status(503).json({ error: "Bot not ready" });
-
-    const guild = client.guilds.cache.first();
-    if (!guild) return res.status(404).json({ error: "No guilds found" });
-
-    await guild.members.fetch().catch(err => {
-      console.error("Failed to fetch members:", err);
-      return;
-    });
-
-    const matches = [];
-    guild.members.cache.forEach(member => {
-      try {
-        if (member.displayName === robloxname) {
-          matches.push({
-            id: member.id,
-            username: member.user.username,
-            displayName: member.displayName
-          });
-        }
-      } catch {}
-    });
-
-    res.json({ found: matches.length > 0, matches });
-  } catch (err) {
-    console.error("Route error:", err);
     res.status(500).json({ error: err.message });
   }
 });
