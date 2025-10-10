@@ -160,16 +160,14 @@ app.get("/checkDisplayname", async (req, res) => {
     const { robloxname } = req.query;
     if (!robloxname) return res.status(400).json({ error: "Missing robloxname" });
 
-    // fetch the first (and only) guild
     const guild = client.guilds.cache.first();
-    if (!guild) return res.status(404).json({ error: "No guilds found for this bot" });
+    if (!guild) return res.status(404).json({ error: "No guilds found" });
 
-    // ensure all members are cached
     await guild.members.fetch();
 
     const matches = [];
     guild.members.cache.forEach(member => {
-      if (member.displayName == robloxname) {
+      if (member.displayName === robloxname) {
         matches.push({
           id: member.id,
           username: member.user.username,
@@ -178,7 +176,7 @@ app.get("/checkDisplayname", async (req, res) => {
       }
     });
 
-    res.json({ found: #matches > 0, matches });
+    res.json({ found: matches.length > 0, matches });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
