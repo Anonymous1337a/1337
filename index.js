@@ -155,19 +155,30 @@ app.get("/ranker", async (req, res) => {
   }
 });
 
-app.get("/displayname", async (req, res) => {
+app.get("/checkDisplayname", async (req, res) => {
   try {
-    const { userid } = req.query;
-    if (!userid) return res.status(400).json({ error: "Missing userid" });
+    const { robloxname } = req.query;
+    if (!robloxname) return res.status(400).json({ error: "Missing robloxname" });
 
-    const r = await fetch(`https://users.roblox.com/v1/users/${userid}`);
-    if (!r.ok) return res.status(r.status).json({ error: "Roblox API error" });
-    const data = await r.json();
+    // fetch the first (and only) guild
+    const guild = client.guilds.cache.first();
+    if (!guild) return res.status(404).json({ error: "No guilds found for this bot" });
 
-    res.json({
-      username: data.name,
-      displayName: data.displayName
+    // ensure all members are cached
+    await guild.members.fetch();
+
+    const matches = [];
+    guild.members.cache.forEach(member => {
+      if (member.displayName == robloxname) {
+        matches.push({
+          id: member.id,
+          username: member.user.username,
+          displayName: member.displayName
+        });
+      }
     });
+
+    res.json({ found: #matches > 0, matches });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
