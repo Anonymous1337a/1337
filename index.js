@@ -161,10 +161,13 @@ app.get("/displayname", async (req, res) => {
     if (!userid) return res.status(400).json({ error: "Missing userid" });
 
     const r = await fetch(`https://users.roblox.com/v1/users/${userid}`);
-    const d = await r.json();
+    if (!r.ok) return res.status(r.status).json({ error: "Roblox API error" });
+    const data = await r.json();
 
-    if (d.displayName) res.json({ displayName: d.displayName });
-    else res.status(404).json({ error: "User not found or invalid ID" });
+    res.json({
+      username: data.name,
+      displayName: data.displayName
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
