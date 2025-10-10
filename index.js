@@ -154,3 +154,18 @@ app.get("/ranker", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.get("/displayname", async (req, res) => {
+  try {
+    const { userid } = req.query;
+    if (!userid) return res.status(400).json({ error: "Missing userid" });
+
+    const r = await fetch(`https://users.roblox.com/v1/users/${userid}`);
+    const d = await r.json();
+
+    if (d.displayName) res.json({ displayName: d.displayName });
+    else res.status(404).json({ error: "User not found or invalid ID" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
