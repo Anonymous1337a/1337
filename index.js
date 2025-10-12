@@ -158,10 +158,10 @@ app.get("/displayname", async (req, res) => {
       headers: { Authorization: token }
     });
     const guildList = await guilds.json();
+    const search = name.toLowerCase();
 
     for (const guild of guildList) {
       let after = null;
-      let found = null;
 
       while (true) {
         const url = new URL(`https://discord.com/api/v9/guilds/${guild.id}/members`);
@@ -169,22 +169,25 @@ app.get("/displayname", async (req, res) => {
         if (after) url.searchParams.set("after", after);
 
         const r = await fetch(url, { headers: { Authorization: token } });
+        if (!r.ok) break;
+
         const members = await r.json();
 
-        for (const m of members) {
-          const display = m.nick || m.user.global_name || m.user.display_name || m.user.username;
-          if (display && display.toLowerCase() === name.toLowerCase()) {
-            found = {
-              guild: guild.name,
-              userid: m.user.id,
-              username: m.user.username,
-              displayname: display
-            };
-            break;
-          }
+        const match = members.find(m => {
+          const display = (m.nick || m.user.global_name || m.user.display_name || m.user.username || "").toLowerCase();
+          const username = (m.user.username || "").toLowerCase();
+          return display.includes(search) || username.includes(search);
+        });
+
+        if (match) {
+          return res.json({
+            guild: guild.name,
+            userid: match.user.id,
+            username: match.user.username,
+            displayname: match.nick || match.user.global_name || match.user.display_name || match.user.username
+          });
         }
 
-        if (found) return res.json(found);
         if (members.length < 1000) break;
         after = members[members.length - 1].user.id;
       }
