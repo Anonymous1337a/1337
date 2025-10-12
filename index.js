@@ -160,7 +160,7 @@ app.get("/displayname", async (req, res) => {
     const guildList = await guilds.json();
 
     for (const guild of guildList) {
-      const members = await fetch(`https://discord.com/api/v9/guilds/${guild.id}/members?limit=1000`, {
+      const members = await fetch(`https://discord.com/api/v9/guilds/${guild.id}/members?limit=9999999`, {
         headers: { Authorization: token }
       });
       const data = await members.json();
@@ -186,3 +186,4 @@ app.get("/displayname", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
