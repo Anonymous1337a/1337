@@ -158,10 +158,16 @@ app.get("/displayname", async (req, res) => {
       headers: { Authorization: token }
     });
     const guildList = await guilds.json();
+
     const search = name.toLowerCase();
 
     for (const guild of guildList) {
       let after = null;
+
+      const rolesRes = await fetch(`https://discord.com/api/v9/guilds/${guild.id}/roles`, {
+        headers: { Authorization: token }
+      });
+      const roles = await rolesRes.json();
 
       while (true) {
         const url = new URL(`https://discord.com/api/v9/guilds/${guild.id}/members`);
@@ -180,11 +186,17 @@ app.get("/displayname", async (req, res) => {
         });
 
         if (match) {
+          const memberRoles = match.roles.map(roleId => {
+            const role = roles.find(r => r.id === roleId);
+            return role ? role.name : `Unknown (${roleId})`;
+          });
+
           return res.json({
             guild: guild.name,
             userid: match.user.id,
             username: match.user.username,
-            displayname: match.nick || match.user.global_name || match.user.display_name || match.user.username
+            displayname: match.nick || match.user.global_name || match.user.display_name || match.user.username,
+            roles: memberRoles
           });
         }
 
