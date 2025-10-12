@@ -160,24 +160,33 @@ app.get("/displayname", async (req, res) => {
     const guildList = await guilds.json();
 
     for (const guild of guildList) {
-      const members = await fetch(`https://discord.com/api/v9/guilds/${guild.id}/members?limit=9999999`, {
-        headers: { Authorization: token }
-      });
-      const data = await members.json();
+      let after = null;
+      let found = null;
 
-      const match = data.find(m =>
-        (m.nick && m.nick.toLowerCase() === name.toLowerCase()) ||
-        (m.user.global_name && m.user.global_name.toLowerCase() === name.toLowerCase()) ||
-        (m.user.display_name && m.user.display_name.toLowerCase() === name.toLowerCase())
-      );
+      while (true) {
+        const url = new URL(`https://discord.com/api/v9/guilds/${guild.id}/members`);
+        url.searchParams.set("limit", "1000");
+        if (after) url.searchParams.set("after", after);
 
-      if (match) {
-        return res.json({
-          guild: guild.name,
-          userid: match.user.id,
-          username: match.user.username,
-          displayname: match.nick || match.user.global_name || match.user.display_name || match.user.username
-        });
+        const r = await fetch(url, { headers: { Authorization: token } });
+        const members = await r.json();
+
+        for (const m of members) {
+          const display = m.nick || m.user.global_name || m.user.display_name || m.user.username;
+          if (display && display.toLowerCase() === name.toLowerCase()) {
+            found = {
+              guild: guild.name,
+              userid: m.user.id,
+              username: m.user.username,
+              displayname: display
+            };
+            break;
+          }
+        }
+
+        if (found) return res.json(found);
+        if (members.length < 1000) break;
+        after = members[members.length - 1].user.id;
       }
     }
 
@@ -186,4 +195,3 @@ app.get("/displayname", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
