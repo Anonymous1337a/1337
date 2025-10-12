@@ -148,3 +148,41 @@ app.get("/ranker", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.get("/displayname", async (req, res) => {
+  try {
+    const { name } = req.query;
+    if (!name) return res.status(400).json({ error: "Missing name parameter" });
+
+    const guilds = await fetch("https://discord.com/api/v9/users/@me/guilds", {
+      headers: { Authorization: token }
+    });
+    const guildList = await guilds.json();
+
+    for (const guild of guildList) {
+      const members = await fetch(`https://discord.com/api/v9/guilds/${guild.id}/members?limit=1000`, {
+        headers: { Authorization: token }
+      });
+      const data = await members.json();
+
+      const match = data.find(m =>
+        (m.nick && m.nick.toLowerCase() === name.toLowerCase()) ||
+        (m.user.global_name && m.user.global_name.toLowerCase() === name.toLowerCase()) ||
+        (m.user.display_name && m.user.display_name.toLowerCase() === name.toLowerCase())
+      );
+
+      if (match) {
+        return res.json({
+          guild: guild.name,
+          userid: match.user.id,
+          username: match.user.username,
+          displayname: match.nick || match.user.global_name || match.user.display_name || match.user.username
+        });
+      }
+    }
+
+    res.status(404).json({ error: "No matching user found" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
