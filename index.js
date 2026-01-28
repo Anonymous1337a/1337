@@ -12,30 +12,22 @@ app.use(express.json({ limit: "10mb" }));
 app.get("/messages/:channelId", async (req, res) => {
   if (!token) return res.status(500).json({ error: "Missing Discord token" });
 
-  const channelId = req.params.channelId;
-  if (!channelId) return res.status(400).json({ error: "Missing channelId" });
-
   try {
-    const r = await fetch(`https://discord.com/api/v9/channels/${channelId}/messages?limit=100`, {
+    const r = await fetch(`https://discord.com/api/v9/channels/${req.params.channelId}/messages?limit=100`, {
       headers: { Authorization: `Bot ${token}` },
       timeout: 8000
     });
 
     const text = await r.text();
-
     try {
       const data = JSON.parse(text);
-      return res.json(data);
+      res.json(data);
     } catch {
-      return res.status(502).json({
-        error: "Upstream Discord returned non-JSON",
-        rawPreview: text.slice(0, 200)
-      });
+      res.status(502).json({ error: "Discord returned non-JSON", rawPreview: text.slice(0,200) });
     }
 
   } catch (err) {
-    console.error("Discord fetch failed:", err);
-    return res.status(502).json({ error: "Failed to fetch from Discord", details: err.message });
+    res.status(502).json({ error: "Failed to fetch from Discord", details: err.message });
   }
 });
 
@@ -228,5 +220,6 @@ app.get("/displayname", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
