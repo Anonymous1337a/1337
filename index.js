@@ -10,14 +10,33 @@ const token = process.env.DISCORD_TOKEN;
 app.use(express.json({ limit: "10mb" }));
 
 app.get("/messages/:channelId", async (req, res) => {
+  if (!token) {
+    return res.status(500).json({ error: "DISCORD_TOKEN not configured" });
+  }
+
+  const channelId = req.params.channelId;
+  if (!channelId) {
+    return res.status(400).json({ error: "Missing channelId" });
+  }
+
   try {
-    const r = await fetch(`https://discord.com/api/v9/channels/${req.params.channelId}/messages?limit=100`, {
+    const r = await fetch(`https://discord.com/api/v9/channels/${channelId}/messages?limit=100`, {
       headers: { Authorization: token }
     });
-    const data = await r.json();
-    res.json(data);
+
+    const text = await r.text();
+
+    try {
+      const data = JSON.parse(text);
+      return res.json(data);
+    } catch {
+      return res.status(502).json({
+        error: "Upstream Discord returned non-JSON",
+        rawPreview: text.slice(0, 200)
+      });
+    }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Fetch failed", details: err.message });
   }
 });
 
@@ -210,3 +229,4 @@ app.get("/displayname", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
