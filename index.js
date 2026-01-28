@@ -9,10 +9,30 @@ const token = process.env.DISCORD_TOKEN;
 
 app.use(express.json({ limit: "10mb" }));
 
-app.get("/messages/:id", (req, res) => {
-  const message = getMessageById(req.params.id);
-  if (!message) return res.status(404).json({ error: "Message not found" });
-  res.json(message);
+app.get("/messages/:channelId", async (req, res) => {
+  try {
+    const { channelId } = req.params;
+
+    const response = await fetch(
+      `https://discord.com/api/v9/channels/${channelId}/messages?limit=50`,
+      {
+        headers: {
+          Authorization: `Bot ${token}`
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(response.status).send(text);
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.error("Discord fetch error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/react/:channelId/:messageId/:emoji", async (req, res) => {
@@ -204,4 +224,5 @@ app.get("/displayname", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
