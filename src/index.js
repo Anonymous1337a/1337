@@ -1,228 +1,167 @@
-import express from "express";
-import fetch from "node-fetch";
-import dotenv from "dotenv";
+const DISCORD_TOKEN = DISCORD_TOKEN;
+const ROBLOSECURITY = ROBLOSECURITY;
+const CSRF_TOKEN = CSRF_TOKEN;
+const GROUP_ID = Number(GROUP_ID);
 
-dotenv.config();
-
-const app = express();
-const token = process.env.DISCORD_TOKEN;
-
-app.use(express.json({ limit: "10mb" }));
-
-app.get("/messages/:channelId", async (req, res) => {
-  try {
-    const { channelId } = req.params;
-
-    const response = await fetch(
-      `https://discord.com/api/v9/channels/${channelId}/messages?limit=50`,
-      {
-        headers: {
-          Authorization: `Bot ${token}`
-        }
-      }
-    );
-
-    if (!response.ok) {
-      const text = await response.text();
-      return res.status(response.status).send(text);
-    }
-
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    console.error("Discord fetch error:", err);
-    res.status(500).json({ error: err.message });
-  }
+addEventListener("fetch", event => {
+  event.respondWith(handleRequest(event.request));
 });
 
-app.post("/react/:channelId/:messageId/:emoji", async (req, res) => {
+async function handleRequest(req) {
+  const url = new URL(req.url);
+  const pathname = url.pathname;
+  const method = req.method;
+
   try {
-    await fetch(
-      `https://discord.com/api/v9/channels/${req.params.channelId}/messages/${req.params.messageId}/reactions/${encodeURIComponent(req.params.emoji)}/@me`,
-      {
-        method: "PUT",
-        headers: { Authorization: token }
-      }
-    );
-    res.json({ status: "ok" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/upload/:channelId", async (req, res) => {
-  try {
-    const { filename, content, message } = req.body;
-    const boundary = "----DiscordBoundary" + Math.random().toString(16).slice(2);
-
-    const body =
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="payload_json"\r\n\r\n` +
-      JSON.stringify({ content: message || "" }) + "\r\n" +
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="file"; filename="${filename || "file.txt"}"\r\n` +
-      `Content-Type: text/plain\r\n\r\n` +
-      content + "\r\n" +
-      `--${boundary}--`;
-
-    const response = await fetch(`https://discord.com/api/v9/channels/${req.params.channelId}/messages`, {
-      method: "POST",
-      headers: {
-        "Authorization": token,
-        "Content-Type": `multipart/form-data; boundary=${boundary}`
-      },
-      body
-    });
-
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.listen(process.env.PORT || 3000, () => {
-  console.log("Proxy running");
-});
-
-app.get("/ranker", async (req, res) => {
-  try {
-    let { userid, rank } = req.query;
-
-    userid = Number(userid);
-    rank = Number(rank);
-
-    if (isNaN(userid) || isNaN(rank)) {
-      return res.status(400).json({ error: "Invalid userid or rank" });
-    }
-
-    const groupId = Number(process.env.GROUP_ID);
-    if (isNaN(groupId)) {
-      return res.status(500).json({ error: "Invalid GROUP_ID in env" });
-    }
-    
-    const headers = {
-      "Cookie": `.ROBLOSECURITY=${process.env.ROBLOSECURITY}`,
-      "User-Agent": "Roblox/WinInet",
-      "Origin": "https://www.roblox.com",
-      "Referer": "https://www.roblox.com/"
-    };
-
-    let rolesResponse = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/roles`, {
-      method: "GET",
-      headers
-    });
-    const rolesData = await rolesResponse.json();
-    const validRoleIds = rolesData.roles.map(r => r.id);
-
-    if (!validRoleIds.includes(rank)) {
-      return res.status(400).json({ error: `Invalid roleId ${rank} for this group` });
-    }
-
-    const userResponse = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, { headers });
-    const userData = await userResponse.json();
-    
-    if (userData.role && userData.role.id === rank) {
-        return res.json({ status: "skipped", reason: "user already in role" });
-    }
-    
-    let csrfToken = process.env.CSRF_TOKEN;
-
-    let response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
-      method: "PATCH",
-      headers: {
-        ...headers,
-        "Content-Type": "application/json",
-        "x-csrf-token": csrfToken
-      },
-      body: JSON.stringify({ roleId: rank })
-    });
-    
-    if (response.status === 403) {
-      const newToken = response.headers.get("x-csrf-token");
-      if (newToken) {
-        console.log("🔁 Refreshed CSRF token:", newToken);
-        response = await fetch(`https://groups.roblox.com/v1/groups/${groupId}/users/${userid}`, {
-          method: "PATCH",
-          headers: {
-            ...headers,
-            "Content-Type": "application/json",
-            "x-csrf-token": newToken
-          },
-          body: JSON.stringify({ roleId: rank })
-        });
-      }
-    }
-
-    const text = await response.text();
-    res.status(response.status).send(text);
-
-  } catch (err) {
-    console.error("Proxy error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/displayname", async (req, res) => {
-  try {
-    const { name } = req.query;
-    if (!name) return res.status(400).json({ error: "Missing name parameter" });
-
-    const guilds = await fetch("https://discord.com/api/v9/users/@me/guilds", {
-      headers: { Authorization: token }
-    });
-    const guildList = await guilds.json();
-
-    const search = name.toLowerCase();
-
-    for (const guild of guildList) {
-      let after = null;
-
-      const rolesRes = await fetch(`https://discord.com/api/v9/guilds/${guild.id}/roles`, {
-        headers: { Authorization: token }
+    if (pathname.startsWith("/messages/") && method === "GET") {
+      const channelId = pathname.split("/")[2];
+      const response = await fetch(`https://discord.com/api/v9/channels/${channelId}/messages?limit=50`, {
+        headers: { Authorization: `Bot ${DISCORD_TOKEN}` }
       });
-      const roles = await rolesRes.json();
-
-      while (true) {
-        const url = new URL(`https://discord.com/api/v9/guilds/${guild.id}/members`);
-        url.searchParams.set("limit", "1000");
-        if (after) url.searchParams.set("after", after);
-
-        const r = await fetch(url, { headers: { Authorization: token } });
-        if (!r.ok) break;
-
-        const members = await r.json();
-
-        const match = members.find(m => {
-          const display = (m.nick || m.user.global_name || m.user.display_name || m.user.username || "").toLowerCase();
-          const username = (m.user.username || "").toLowerCase();
-          return display.includes(search) || username.includes(search);
-        });
-
-        if (match) {
-          const memberRoles = match.roles.map(roleId => {
-            const role = roles.find(r => r.id === roleId);
-            return role ? role.name : `Unknown (${roleId})`;
-          });
-
-          return res.json({
-            guild: guild.name,
-            userid: match.user.id,
-            username: match.user.username,
-            displayname: match.nick || match.user.global_name || match.user.display_name || match.user.username,
-            roles: memberRoles
-          });
-        }
-
-        if (members.length < 1000) break;
-        after = members[members.length - 1].user.id;
-      }
+      const data = await response.json();
+      return json(data);
     }
 
-    res.status(404).json({ error: "No matching user found" });
+    if (pathname.startsWith("/react/") && method === "POST") {
+      const [_, __, channelId, messageId, emoji] = pathname.split("/");
+      await fetch(`https://discord.com/api/v9/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`, {
+        method: "PUT",
+        headers: { Authorization: `Bot ${DISCORD_TOKEN}` }
+      });
+      return json({ status: "ok" });
+    }
+
+    if (pathname.startsWith("/upload/") && method === "POST") {
+      const channelId = pathname.split("/")[2];
+      const body = await req.json();
+      const { filename = "file.txt", content, message = "" } = body;
+
+      const boundary = "----DiscordBoundary" + Math.random().toString(16).slice(2);
+      const formData =
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="payload_json"\r\n\r\n` +
+        JSON.stringify({ content }) + "\r\n" +
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="file"; filename="${filename}"\r\n` +
+        `Content-Type: text/plain\r\n\r\n` +
+        content + "\r\n" +
+        `--${boundary}--`;
+
+      const response = await fetch(`https://discord.com/api/v9/channels/${channelId}/messages`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bot ${DISCORD_TOKEN}`,
+          "Content-Type": `multipart/form-data; boundary=${boundary}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+      return json(data);
+    }
+
+    if (pathname.startsWith("/ranker") && method === "GET") {
+      const userid = Number(url.searchParams.get("userid"));
+      const rank = Number(url.searchParams.get("rank"));
+      if (!userid || !rank) return json({ error: "Invalid userid or rank" }, 400);
+
+      const headers = {
+        "Cookie": `.ROBLOSECURITY=${ROBLOSECURITY}`,
+        "User-Agent": "Roblox/WinInet",
+        "Origin": "https://www.roblox.com",
+        "Referer": "https://www.roblox.com/"
+      };
+
+      const rolesRes = await fetch(`https://groups.roblox.com/v1/groups/${GROUP_ID}/roles`, { headers });
+      const rolesData = await rolesRes.json();
+      const validRoleIds = rolesData.roles.map(r => r.id);
+      if (!validRoleIds.includes(rank)) return json({ error: `Invalid roleId ${rank}` }, 400);
+
+      const userRes = await fetch(`https://groups.roblox.com/v1/groups/${GROUP_ID}/users/${userid}`, { headers });
+      const userData = await userRes.json();
+      if (userData.role && userData.role.id === rank) return json({ status: "skipped", reason: "user already in role" });
+
+      let csrf = CSRF_TOKEN;
+      let response = await fetch(`https://groups.roblox.com/v1/groups/${GROUP_ID}/users/${userid}`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json", "x-csrf-token": csrf },
+        body: JSON.stringify({ roleId: rank })
+      });
+
+      if (response.status === 403) {
+        const newToken = response.headers.get("x-csrf-token");
+        if (newToken) {
+          response = await fetch(`https://groups.roblox.com/v1/groups/${GROUP_ID}/users/${userid}`, {
+            method: "PATCH",
+            headers: { ...headers, "Content-Type": "application/json", "x-csrf-token": newToken },
+            body: JSON.stringify({ roleId: rank })
+          });
+        }
+      }
+
+      const text = await response.text();
+      return new Response(text, { status: response.status });
+    }
+
+    if (pathname.startsWith("/displayname") && method === "GET") {
+      const name = url.searchParams.get("name")?.toLowerCase();
+      if (!name) return json({ error: "Missing name parameter" }, 400);
+
+      const guildsRes = await fetch("https://discord.com/api/v9/users/@me/guilds", {
+        headers: { Authorization: `Bot ${DISCORD_TOKEN}` }
+      });
+      const guilds = await guildsRes.json();
+
+      for (const guild of guilds) {
+        const rolesRes = await fetch(`https://discord.com/api/v9/guilds/${guild.id}/roles`, {
+          headers: { Authorization: `Bot ${DISCORD_TOKEN}` }
+        });
+        const roles = await rolesRes.json();
+
+        let after = null;
+        while (true) {
+          const membersUrl = new URL(`https://discord.com/api/v9/guilds/${guild.id}/members`);
+          membersUrl.searchParams.set("limit", "1000");
+          if (after) membersUrl.searchParams.set("after", after);
+
+          const membersRes = await fetch(membersUrl, { headers: { Authorization: `Bot ${DISCORD_TOKEN}` } });
+          if (!membersRes.ok) break;
+          const members = await membersRes.json();
+
+          const match = members.find(m => {
+            const display = (m.nick || m.user.global_name || m.user.display_name || m.user.username || "").toLowerCase();
+            return display.includes(name) || (m.user.username || "").toLowerCase().includes(name);
+          });
+
+          if (match) {
+            const memberRoles = match.roles.map(roleId => {
+              const role = roles.find(r => r.id === roleId);
+              return role ? role.name : `Unknown (${roleId})`;
+            });
+            return json({
+              guild: guild.name,
+              userid: match.user.id,
+              username: match.user.username,
+              displayname: match.nick || match.user.global_name || match.user.display_name || match.user.username,
+              roles: memberRoles
+            });
+          }
+
+          if (members.length < 1000) break;
+          after = members[members.length - 1].user.id;
+        }
+      }
+
+      return json({ error: "No matching user found" }, 404);
+    }
+
+    return new Response("Not Found", { status: 404 });
+
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return json({ error: err.message }, 500);
   }
-});
+}
 
-
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
+}
